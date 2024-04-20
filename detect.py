@@ -1,7 +1,6 @@
 from ultralytics import YOLO
 import cv2
-
-import math
+import time
 import numpy as np
 import cvutils as cu
 
@@ -38,6 +37,8 @@ with mouse.Listener(on_click=get_windowd_on_click) as listener:
 # initialize the WindowCapture class
 windowCap = WindowCapture(window_name)
 
+# Log detections etc to console
+consoledebug = True
 
 # Save model to folder for project so this is not downloaded avery time
 model = YOLO("./yolo-weights/yolov8n.pt")
@@ -134,42 +135,24 @@ while True:
     image = None
     img = windowCap.screenshot
 
-    results = model(img, stream=False)
+    results = model(img, stream=False, verbose=consoledebug)
 
     for r in results:
-        boxes = r.boxes
-        for box in boxes:
-            x1, y1, x2, y2 = box.xyxy[
-                0
-            ]  # box xy,xy coordinates (easier to input to opencv) just get first detected box
-            x1, y1, x2, y2 = int(x1), int(y1), int(x2), int(y2)
-
-            # Top left + width and height
-            bbox = int(x1), int(y1), int(x2 - x1), int(y2 - y1)
-
-            ## Confidence
-            conf = (
-                math.ceil((box.conf[0]) * 100) / 100
-            )  # confidentce with 2 decimal accuracy
-
-            # Class name
-            cls = box.cls[0]
-            if int(cls) < len(classNames):
-                currentClass = classNames[int(cls)]
-            else:
-                currentClass = int(cls)
-
-            if conf > 0.7:
-                image = cu.roundedTextbox(
-                    img,
-                    [x1, y1, x2, y2],
-                    f"{currentClass}",
-                    text_offset_x=20,
-                    text_offset_y=10,
-                    thickness=1,
-                    background_RGBA=(149, 146, 202, 128),
-                    text_RGBA=(198, 198, 198, 245),
-                )
+        tic = time.perf_counter_ns()
+        image = cu.imageOverlay(
+            img,
+            r.boxes,
+            classNames,
+            confidenceThreshold=0.6,
+            text_offset_x=20,
+            text_offset_y=10,
+            thickness=1,
+            background_RGBA=(149, 146, 202, 128),
+            text_RGBA=(198, 198, 198, 245),
+        )
+        toc = time.perf_counter_ns()
+        if consoledebug:
+            print(f"Draw image overlay in {(toc-tic)/1000000:0.4f} ms")
 
         if image:
             cv2.imshow("Image", cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR))
